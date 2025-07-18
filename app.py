@@ -3,11 +3,14 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import joblib
 import numpy as np
+import lightgbm as lgb
+import scipy.sparse
 
 st.set_page_config(layout="wide")
 
-# Load model
-model = joblib.load("shot_model.pkl")
+# Load model and scaler
+model = lgb.Booster(model_file="shot_model_lgbm.txt")
+scaler = joblib.load("scaler.pkl")
 
 court_length = 50
 court_width = 47
@@ -37,5 +40,15 @@ st.pyplot(fig)
 
 # Predict
 X = np.array([[shot_dist, def_dist]])
-prob = model.predict_proba(X)[0][1]
-st.subheader(f"📈 Predicted Make Probability: **{round(prob * 100, 2)}%**")
+X_scaled = scaler.transform(X)
+prob = model.predict(X_scaled)
+# Ensure prob is a flat numpy array, even if sparse
+try:
+    import scipy.sparse
+    if scipy.sparse.issparse(prob):
+        prob = scipy.sparse.csr_matrix(prob).toarray().flatten()
+    else:
+        prob = np.array(prob).flatten()
+except Exception:
+    prob = np.array(prob).flatten()
+st.subheader(f"📈 Predicted Make Probability: **{round(prob[0] * 100, 2)}%**")
